@@ -75,10 +75,36 @@ def get_timeslot_count(driver):
     print(f"Found {len(clickable_elements)} available timeslots.")
     return len(clickable_elements)
 
+def send_email(subject, body):
+    """Sends an email using SendGrid."""
+    
+    # Retrieve credentials and email addresses from environment variables.
+    api_key = os.environ.get("SENDGRID_API_KEY")
+    from_email = os.environ.get("SENDGRID_FROM_EMAIL")
+    to_email = os.environ.get("SENDGRID_TO_EMAIL")
+    
+    if not api_key or not from_email or not to_email:
+        raise ValueError("SENDGRID_API_KEY, SENDGRID_FROM_EMAIL, and SENDGRID_TO_EMAIL must be set in your environment.")
+
+    message = Mail(
+        from_email = from_email,
+        to_emails = to_email,
+        subject = subject,
+        plain_text_content = body
+    )
+    
+    try:
+        sg = SendGridAPIClient(api_key)
+        response = sg.send(message)
+        print(f"Email sent. Status code: {response.status_code}")
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+
 def main():
 
     # Load the environment variables
     load_dotenv()
+    LINK = os.environ.get("TEST_LINK")
 
     # Load persistent state
     state = load_state()
@@ -89,7 +115,7 @@ def main():
 
     # Initialize the webdriver
     driver = webdriver.Firefox(service=service)
-    driver.get(TEST_LINK)
+    driver.get(LINK)
 
     # Navigate to the correct subpage
     execute_clicks(driver, GO_TO_CALENDAR_TEST)
@@ -111,7 +137,10 @@ def main():
 
     if current_timeslot_count > previous_timeslot_count:
         print("Detected new timeslots. Sending email to user.")
-        # Send an email to the user
+        subject = "New Timeslots Available!"
+        body = (f"The number of available timeslots increased from {previous_timeslot_count} "
+                f"to {current_timeslot_count}.\nCheck the Rezervanto page for details.")
+        send_email(subject, body)
 
     state["last_known_timeslot_count"] = current_timeslot_count
     save_state(state)

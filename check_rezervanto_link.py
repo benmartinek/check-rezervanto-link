@@ -4,6 +4,7 @@ This module continuously checks a Rezervanto appointment link for new timeslots,
 
 import json
 import os
+import logging
 
 from dotenv import load_dotenv
 
@@ -12,6 +13,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.firefox.service import Service
+from selenium.webdriver.firefox.options import Options
 
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
@@ -37,6 +39,12 @@ GO_TO_CALENDAR_TEST = [ # Steps to take to navigate to the test calendar page
 GO_NEXT_WEEK = [ # Steps to take to navigate to the next week
     {"by": By.CSS_SELECTOR, "value": "#calendar-right .load", "description": "Next week arrow"}
 ]
+
+logging.basicConfig(
+    filename="log.txt",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 def load_state():
     """Load the persistent state from the JSON file."""
@@ -102,6 +110,8 @@ def send_email(subject, body):
 
 def main():
 
+    logging.info("Script started.")
+
     # Load the environment variables
     load_dotenv()
     LINK = os.environ.get("TEST_LINK")
@@ -110,11 +120,16 @@ def main():
     state = load_state()
     current_timeslot_count = 0
 
+    # Set up Firefox options for headless mode.
+    options = Options()
+    options.headless = True
+    options.add_argument("--headless")
+
     # Create a Service object for geckodriver.
     service = Service(GECKODRIVER_PATH)
 
     # Initialize the webdriver
-    driver = webdriver.Firefox(service=service)
+    driver = webdriver.Firefox(service=service, options=options)
     driver.get(LINK)
 
     # Navigate to the correct subpage
@@ -131,6 +146,7 @@ def main():
             time.sleep(2)
 
     print (f"Found {current_timeslot_count} timeslots in the next {WEEKS_TO_CHECK} weeks.")
+    logging.info(f"Found {current_timeslot_count} timeslots in the next {WEEKS_TO_CHECK} weeks.")
 
     # If the number of timeslots has increased, send an email to the user
     previous_timeslot_count = state.get("last_known_timeslot_count", 0)
@@ -146,6 +162,7 @@ def main():
     save_state(state)
 
     driver.quit()
+    logging.info("Script finished.")
 
 if __name__ == "__main__":
     main()
